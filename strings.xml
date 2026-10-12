@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">悬浮键盘</string>
+    <string name="accessibility_desc">允许悬浮键盘读取前台应用的输入框并把字符直接写入，实现跨应用打字。本服务不收集、不上传任何输入内容。</string>
+</resources>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,maximum-scale=1,viewport-fit=cover">
+<title>FloatKey</title>
+<style>
+  :root{
+    --bg:#1e1e2e; --row:#2d2d44; --row2:#262638; --key:#3a3a52; --key2:#44445e;
+    --txt:#dcd6f7; --dim:#8b87a9; --accent:#7c4dff; --accent2:#b388ff;
+    --enter:#00bfa5; --shift:#ff9100; --num:#ff5252; --fn:#536dfe;
+    --spacebar:#4a4a66; --shadow:0 2px 0 #151520,0 4px 10px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:transparent;
+    font-family:-apple-system,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    user-select:none;-webkit-user-select:none;touch-action:none}
+  body{
+    display:flex;flex-direction:column;justify-content:flex-end;
+    background:linear-gradient(180deg,rgba(30,30,46,.94),rgba(24,24,40,.97));
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+  }
+  .pad{height:26px;flex:0 0 auto;display:flex;align-items:center;gap:10px;
+    padding:0 8px;color:var(--dim);font-size:11px}
+  .pad b{color:var(--accent2);font-weight:600}
+  .kb{flex:1 1 auto;display:flex;flex-direction:column;gap:5px;min-height:0}
+  .row{display:flex;gap:4px;flex:1 1 auto;min-height:0}
+  .k{flex:1 1 auto;min-width:0;height:100%;position:relative;
+    background:linear-gradient(180deg,var(--key2),var(--key));
+    border-radius:7px;color:var(--txt);font-size:13px;font-weight:500;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:var(--shadow);
+    transition:transform .04s,background .12s,box-shadow .04s}
+  .k:active,.k.on{transform:translateY(2px);
+    background:linear-gradient(180deg,var(--accent),#5c35d6);
+    box-shadow:0 0 0 #151520,0 1px 3px rgba(0,0,0,.4);color:#fff}
+  .k small{position:absolute;top:3px;left:5px;font-size:8.5px;color:var(--dim);font-weight:400}
+  .k i{font-style:normal;font-size:10px;color:var(--accent2)}
+  /* 功能键配色 */
+  .k.fn{background:linear-gradient(180deg,#3f4db5,#35409a);font-size:10.5px}
+  .k.num{background:linear-gradient(180deg,#c04848,#a03a3a)}
+  .k.shift{background:linear-gradient(180deg,#c9761c,#b06610);flex:1.35 1 auto}
+  .k.enter{background:linear-gradient(180deg,#009e88,#008273);flex:1.55 1 auto}
+  .k.space{flex:6 1 auto;background:linear-gradient(180deg,#54546e,#4a4a66)}
+  .k.del{background:linear-gradient(180deg,#c04848,#a03a3a)}
+  .k.tab{background:linear-gradient(180deg,#3f4db5,#35409a);flex:1.3 1 auto}
+  .k.ctrl{background:linear-gradient(180deg,#3f4db5,#35409a);flex:1.25 1 auto}
+  .k.alt{background:linear-gradient(180deg,#3f4db5,#35409a);flex:1.25 1 auto}
+  .k.esc{background:linear-gradient(180deg,#6a3a3a,#5a3030)}
+  .k.lang{font-size:11px;flex:1.4 1 auto}
+  .w05{flex:.5 1 auto}.w15{flex:1.5 1 auto}.w175{flex:1.75 1 auto}.w2{flex:2 1 auto}
+  .r5{height:auto}
+  .led{width:5px;height:5px;border-radius:50%;background:#333;margin-left:4px}
+  .led.on{background:#ff5252;box-shadow:0 0 5px #ff5252}
+  .tray{height:32px;flex:0 0 auto;display:flex;align-items:center;gap:8px;
+    padding:0 6px;color:var(--dim);font-size:11px}
+  .tray .sp{flex:1}
+  .chip{height:26px;padding:0 12px;border-radius:13px;background:var(--row);
+    color:var(--txt);display:flex;align-items:center;font-size:11px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+  .chip.on{background:var(--accent);color:#fff}
+</style>
+</head>
+<body>
+  <div class="pad">
+    <span>⌨ <b>悬浮键盘</b></span>
+    <span>· 点按键直接输入到下方应用</span>
+    <span class="sp" style="flex:1"></span>
+    <span id="lock"></span>
+  </div>
+  <div class="kb" id="kb"></div>
+  <div class="tray">
+    <span class="chip" id="cSym">123</span>
+    <span class="chip" id="cMore">#+=</span>
+    <span class="chip" id="cFn">Fn</span>
+    <span class="sp" style="flex:1"></span>
+    <span class="chip" id="cClear">清空</span>
+    <span class="chip" id="cSend">发送</span>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+  var layers = {
+    main: [
+      [{t:"esc",k:"Escape",c:"esc"},{t:"F1"},{t:"F2"},{t:"F3"},{t:"F4"},{t:"F5"},{t:"F6"},{t:"F7"},{t:"F8"},{t:"F9"},{t:"F10"},{t:"F11"},{t:"F12"},{t:"⌫",k:"Backspace",c:"del w15"}],
+      [{t:"`",k:"`",s:"~"},{t:"1",k:"1",s:"!"},{t:"2",k:"2",s:"@"},{t:"3",k:"3",s:"#"},{t:"4",k:"4",s:"$"},{t:"5",k:"5",s:"%"},{t:"6",k:"6",s:"^"},{t:"7",k:"7",s:"&"},{t:"8",k:"8",s:"•"},{t:"9",k:"9",s:")"},{t:"0",k:"0",s:"("},{t:"-",k:"-",s:"_"},{t:"=",k:"=",s:"+"},{t:"⌫",k:"Backspace",c:"del w175"}],
+      [{t:"⇥",k:"Tab",c:"tab"},{t:"q"},{t:"w"},{t:"e"},{t:"r"},{t:"t"},{t:"y"},{t:"u"},{t:"i"},{t:"o"},{t:"p"},{t:"[",k:"[",s:"{"},{t:"]",k:"]",s:"}"},{t:"\\",k:"\\",s:"|",c:"w15"}],
+      [{t:"⇧",k:"Shift",c:"shift"},{t:"a"},{t:"s"},{t:"d"},{t:"f"},{t:"g"},{t:"h"},{t:"j"},{t:"k"},{t:"l"},{t:";",k:";",s:":"},{t:"'",k:"'",s:'"'},{t:"⏎",k:"Enter",c:"enter w2"}],
+      [{t:"⇧",k:"Shift",c:"shift w2"},{t:"z"},{t:"x"},{t:"c"},{t:"v"},{t:"b"},{t:"n"},{t:"m"},{t:",",k:",",s:"<"},{t:".",k:".",s:">"},{t:"/",k:"/",s:"?"},{t:"⇧",k:"Shift",c:"shift w15"}],
+      [{t:"Ctrl",k:"Control",c:"ctrl"},{t:"☰",k:"Meta",c:"ctrl"},{t:"Alt",k:"Alt",c:"alt"},{t:" ",k:" ",c:"space"},{t:"Alt",k:"Alt",c:"alt"},{t:"←",k:"ArrowLeft",c:"fn"},{t:"↓",k:"ArrowDown",c:"fn"},{t:"→",k:"ArrowRight",c:"fn"}]
+    ],
+    sym: [
+      [{t:"esc",k:"Escape",c:"esc"},{t:"F1",c:"fn"},{t:"F2",c:"fn"},{t:"F3",c:"fn"},{t:"F4",c:"fn"},{t:"F5",c:"fn"},{t:"F6",c:"fn"},{t:"F7",c:"fn"},{t:"F8",c:"fn"},{t:"F9",c:"fn"},{t:"F10",c:"fn"},{t:"F11",c:"fn"},{t:"F12",c:"fn"},{t:"⌫",k:"Backspace",c:"del w15"}],
+      [{t:"~",k:"~"},{t:"!",k:"!"},{t:"@",k:"@"},{t:"#",k:"#"},{t:"$",k:"$"},{t:"%",k:"%"},{t:"^",k:"^"},{t:"&",k:"&"},{t:"•",k:"•"},{t:"(",k:"("},{t:")",k:")"},{t:"_",k:"_"},{t:"+",k:"+"},{t:"⌫",k:"Backspace",c:"del w175"}],
+      [{t:"⇥",k:"Tab",c:"tab"},{t:"1"},{t:"2"},{t:"3"},{t:"4"},{t:"5"},{t:"6"},{t:"7"},{t:"8"},{t:"9"},{t:"0"},{t:"{",k:"{"},{t:"}",k:"}"},{t:"|",k:"|",c:"w15"}],
+      [{t:"⇧",k:"Shift",c:"shift"},{t:"!",k:"!"},{t:"@",k:"@"},{t:"#",k:"#"},{t:"$",k:"$"},{t:"%",k:"%"},{t:"^",k:"^"},{t:"&",k:"&"},{t:"•",k:"•"},{t:"*",k:"*"},{t:":",k:":"},{t:'"',k:'"'},{t:"⏎",k:"Enter",c:"enter w2"}],
+      [{t:"⇧",k:"Shift",c:"shift w2"},{t:"~",k:"~"},{t:"?",k:"?"},{t:"!",k:"!"},{t:"¡",k:"¡"},{t:"？",k:"？"},{t:"！",k:"！"},{t:"…",k:"…"},{t:"、",k:"、"},{t:"，",k:"，"},{t:"。",k:"。"},{t:"？",k:"？",c:"shift w15"}],
+      [{t:"Ctrl",k:"Control",c:"ctrl"},{t:"☰",k:"Meta",c:"ctrl"},{t:"Alt",k:"Alt",c:"alt"},{t:" ",k:" ",c:"space"},{t:"Alt",k:"Alt",c:"alt"},{t:"←",k:"ArrowLeft",c:"fn"},{t:"↓",k:"ArrowDown",c:"fn"},{t:"→",k:"ArrowRight",c:"fn"}]
+    ],
+    more: [
+      [{t:"esc",k:"Escape",c:"esc"},{t:"F1",c:"fn"},{t:"F2",c:"fn"},{t:"F3",c:"fn"},{t:"F4",c:"fn"},{t:"F5",c:"fn"},{t:"F6",c:"fn"},{t:"F7",c:"fn"},{t:"F8",c:"fn"},{t:"F9",c:"fn"},{t:"F10",c:"fn"},{t:"F11",c:"fn"},{t:"F12",c:"fn"},{t:"⌫",k:"Backspace",c:"del w15"}],
+      [{t:"§",k:"§"},{t:"±",k:"±"},{t:"¶",k:"¶"},{t:"•",k:"•"},{t:"†",k:"†"},{t:"‡",k:"‡"},{t:"‰",k:"‰"},{t:"≤",k:"≤"},{t:"≥",k:"≥"},{t:"≠",k:"≠"},{t:"≈",k:"≈"},{t:"∞",k:"∞"},{t:"∆",k:"∆"},{t:"⌫",k:"Backspace",c:"del w175"}],
+      [{t:"⇥",k:"Tab",c:"tab"},{t:"¡",k:"¡"},{t:"™",k:"™"},{t:"£",k:"£"},{t:"¢",k:"¢"},{t:"¥",k:"¥"},{t:"€",k:"€"},{t:"©",k:"©"},{t:"®",k:"®"},{t:"°",k:"°"},{t:"√",k:"√"},{t:"∫",k:"∫"},{t:"µ",k:"µ"},{t:"Σ",k:"Σ",c:"w15"}],
+      [{t:"⇧",k:"Shift",c:"shift"},{t:"æ",k:"æ"},{t:"ø",k:"ø"},{t:"œ",k:"œ"},{t:"ß",k:"ß"},{t:"ð",k:"ð"},{t:"þ",k:"þ"},{t:"÷",k:"÷"},{t:"×",k:"×"},{t:"¬",k:"¬"},{t:"¦",k:"¦"},{t:"¨",k:"¨"},{t:"⏎",k:"Enter",c:"enter w2"}],
+      [{t:"⇧",k:"Shift",c:"shift w2"},{t:"⌘",k:"⌘"},{t:"⏎",k:"Enter"},{t:"⎋",k:"Escape"},{t:"⇥",k:"Tab"},{t:"⌫",k:"Backspace"},{t:"↑",k:"ArrowUp",c:"fn"},{t:"↓",k:"ArrowDown",c:"fn"},{t:"←",k:"ArrowLeft",c:"fn"},{t:"→",k:"ArrowRight",c:"fn"},{t:"⇧",k:"Shift",c:"shift w15"}],
+      [{t:"Ctrl",k:"Control",c:"ctrl"},{t:"☰",k:"Meta",c:"ctrl"},{t:"Alt",k:"Alt",c:"alt"},{t:" ",k:" ",c:"space"},{t:"Alt",k:"Alt",c:"alt"},{t:"←",k:"ArrowLeft",c:"fn"},{t:"↓",k:"ArrowDown",c:"fn"},{t:"→",k:"ArrowRight",c:"fn"}]
+    ]
+  };
+
+  var layer = "main";
+  var shift = 0;        // 0 关, 1 单次, 2 锁定
+  var caps = 0;
+  var fnOn = false;
+
+  var kb = document.getElementById("kb");
+
+  function emit(obj){ if(window.FloatKey) FloatKey.press(JSON.stringify(obj)); }
+
+  function setLayer(L){
+    layer = L;
+    render();
+    document.getElementById("cSym").classList.toggle("on", L==="sym");
+    document.getElementById("cMore").classList.toggle("on", L==="more");
+  }
+
+  function keyClass(k){
+    var c = ["k"];
+    if(k.c) c.push(k.c);
+    if(/^F\d/.test(k.t)||k.t==="esc"||k.t==="⇥"||k.t==="Tab"||k.t==="←"||k.t==="↓"||k.t==="→") c.push("fn");
+    if(k.t==="⌫"||k.t==="⏎") c.push(k.t==="⌫"?"del":"enter");
+    if(k.t==="⇧"||k.t==="Shift") c.push("shift");
+    if(k.t==="Ctrl"||k.t==="Alt"||k.t==="☰") c.push("ctrl");
+    if(k.t===" ") c.push("space");
+    return c.join(" ");
+  }
+
+  function pickChar(k){
+    var ch = k.k || k.t;
+    if(shift===1 || caps===1){
+      if(k.s) ch = k.s;
+      else if(ch.length===1) ch = ch.toUpperCase();
+    }
+    return ch;
+  }
+
+  function render(){
+    var rows = layers[layer];
+    kb.innerHTML = "";
+    for(var r=0;r<rows.length;r++){
+      var row = document.createElement("div");
+      row.className = "row";
+      for(var i=0;i<rows[r].length;i++){
+        var k = rows[r][i];
+        var el = document.createElement("div");
+        el.className = keyClass(k);
+        el.innerHTML = '<small>'+(k.s||"")+'</small><span>'+(k.t===" "?">&nbsp;":k.t)+'</span>';
+        el.dataset.key = JSON.stringify(k);
+        bind(el, k);
+        row.appendChild(el);
+      }
+      kb.appendChild(row);
+    }
+    var led = document.getElementById("lock");
+    led.innerHTML = (caps===2?'<span class="led on" title="大写锁定"></span>':'<span class="led"></span>')
+                   + (shift===2?'<span class="led on" title="Shift锁定"></span>':'<span class="led"></span>');
+  }
+
+  function bind(el, k){
+    var down = false, timer = null;
+    function press(e){
+      if(e) e.preventDefault();
+      if(down) return; down = true;
+      el.classList.add("on");
+      handleKey(k);
+    }
+    function release(e){
+      if(e) e.preventDefault();
+      down = false;
+      el.classList.remove("on");
+    }
+    el.addEventListener("touchstart", press, {passive:false});
+    el.addEventListener("touchend", release, {passive:false});
+    el.addEventListener("touchcancel", release, {passive:false});
+    el.addEventListener("mousedown", press);
+    el.addEventListener("mouseup", release);
+    el.addEventListener("mouseleave", release);
+  }
+
+  function handleKey(k){
+    var code = k.k || k.t;
+    // 功能键
+    if(code==="Shift"){
+      if(shift===0){ shift=1; }
+      else if(shift===1){ shift=2; }
+      else { shift=0; }
+      render(); return;
+    }
+    if(code==="Control"||code==="Alt"||code==="Meta"){
+      // 修饰键：先派发按下，松开时不发（保持简单：仅发一次按键，网页游戏可识别）
+      emit({k:code}); return;
+    }
+    if(code==="CapsLock"){
+      caps = caps===2 ? 0 : 2;
+      render(); emit({k:"CapsLock"}); return;
+    }
+    if(code==="Enter"){ emit({k:"Enter"}); afterChar(); return; }
+    if(code==="Backspace"){ emit({k:"Backspace"}); return; }
+    if(code==="Tab"){ emit({k:"Tab"}); return; }
+    if(code==="Escape"){ emit({k:"Escape"}); return; }
+    if(/^Arrow/.test(code)||/^F\d/.test(code)){
+      emit({k:code}); afterChar(); return;
+    }
+    if(code===" "){ emit({k:"Space"}); afterChar(); return; }
+    // 普通字符
+    emit({text: pickChar(k)});
+    afterChar();
+  }
+
+  function afterChar(){
+    if(shift===1) shift=0;
+    render();
+  }
+
+  // 底部托盘
+  document.getElementById("cSym").onclick = function(){ setLayer(layer==="sym"?"main":"sym"); };
+  document.getElementById("cMore").onclick = function(){ setLayer(layer==="more"?"main":"more"); };
+  document.getElementById("cFn").onclick = function(){
+    fnOn = !fnOn; this.classList.toggle("on", fnOn);
+    // Fn 行显示：开启时把 F1-F12 行放到第一排（当前层已含）
+  };
+  document.getElementById("cClear").onclick = function(){ emit({text:""}); };
+  document.getElementById("cSend").onclick = function(){ emit({k:"Enter"}); };
+
+  render();
+})();
+</script>
+</body>
+</html>
